@@ -1,0 +1,105 @@
+---
+title: "Stigma Trends Explorer"
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    toc: true
+    code-fold: true
+editor: visual
+execute:
+  echo: true
+  warning: false
+  message: false
+  eval: true
+runtime: shiny
+---
+
+```{r setup}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(plotly)
+library(glue)
+library(stringr)
+library(readr)
+library(shiny)
+```
+
+```{r load-data}
+stigma_trends <- read_csv('stigma_trends.csv')
+
+# 1. Pivot longer on means (excluding *_se)
+means_long <- stigma_trends %>%
+  pivot_longer(
+    cols = matches("^mean_(?!.*_se$)", perl = TRUE),
+    names_to = "variable",
+    values_to = "mean"
+  ) %>%
+  mutate(variable = str_remove(variable, "^mean_")) %>%
+  select(variable, mean, state_calc, year_group) %>% 
+  mutate(variable = str_trim(variable))
+
+# 2. Pivot longer on SEs
+ses_long <- stigma_trends %>%
+  pivot_longer(
+    cols = ends_with("_se"),
+    names_to = "variable",
+    values_to = "se"
+  ) %>%
+  mutate(variable = str_remove(variable, "_se$")) %>%
+  mutate(variable = str_remove(variable, "^mean_")) %>%
+  select(variable, se, state_calc, year_group) %>% 
+  mutate(variable = str_trim(variable))
+
+# 3. Join and keep only relevant columns
+stigma_long_all <- left_join(
+  means_long,
+  ses_long,
+  by = c("variable", "state_calc", "year_group")
+) %>%
+  mutate(year_mid = as.numeric(substr(year_group, 1, 4)) + 0.5)
+```
+
+```{r plot-function}
+plot_distr <- function(state) {
+  stigma_long_all %>%
+    filter(state_calc == state) %>%
+    ggplot(aes(x = year_mid, y = mean, group = variable)) +
+    geom_ribbon(aes(ymin = mean - se, ymax = mean + se, fill = variable), alpha = 0.2, color = NA) +
+    geom_line(aes(color = variable), size = 1) +
+    geom_point(aes(color = variable), size = 2) +
+    facet_wrap(~ variable, scales = "free_y", ncol = 3) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+    labs(
+      title = glue("Weighted Trends for: {state}"),
+      x = "Year Group Midpoint", y = "Weighted Mean (\u00b1 SE)",
+      caption = "Shaded ribbon = \u00b11 SE"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      strip.text = element_text(face = "bold"),
+      legend.position = "none"
+    )
+}
+```
+
+## Select a state to view trends
+
+```{r shiny-ui}
+selectInput(
+  inputId = "state", 
+  label = "State:", 
+  choices = sort(unique(stigma_long_all$state_calc)),
+  selected = "PA"
+)
+plotlyOutput("trend_plot", height = "700px")
+```
+
+```{r shiny-plot}
+output$trend_plot <- renderPlotly({
+  ggplotly(plot_distr(input$state)) %>%
+    layout(margin = list(t = 60))
+})
+```
