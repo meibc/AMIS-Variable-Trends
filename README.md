@@ -1,4 +1,4 @@
-# AMIS Variable Trends Explorer
+# Trends in AMIS variables (2015-2022)
 
 This repository documents the data standardization process used to compare responses across survey years from the American Men’s Internet Survey (AMIS). The goal is to harmonize indicators related to stigma and HIV care engagement over time to enable valid trend analyses at the U.S. state level.
 
