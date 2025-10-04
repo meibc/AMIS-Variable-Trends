@@ -5,9 +5,19 @@
 
 # Load necessary libraries
 library(tidyverse)
+library(dplyr)
 library(lubridate)
 
-source("utils.R")
+
+# Helper function: Recode binary variables in data cleaning 
+recode_binary <- function(x, one_vals, zero_vals = NULL) {
+  case_when(
+    x %in% c(7, 9) ~ NA_real_,
+    !is.null(zero_vals) & x %in% zero_vals ~ 0,
+    x %in% one_vals ~ 1,
+    TRUE ~ NA_real_
+  )
+}
 
 # Cleans combined AMIS dataset
 read_and_clean_amis <- function(file_path) {
@@ -48,11 +58,11 @@ read_and_clean_amis <- function(file_path) {
       talkhiv    = if_else(talkhiv %in% c(7, 9), 0, talkhiv),
       insur_bin  = recode_binary(`_inscat`, one_vals = 2:4, zero_vals = 1),
       income_bin = recode_binary(income, one_vals = 4, zero_vals = 1:3),
-      risk_behavior = if_else(rowSums(select(., m_muauhs, m_muahp), na.rm = TRUE) > 0, 1L, 0L),
+      risk_behavior = if_else(rowSums(pick(m_muauhs, m_muahp), na.rm = TRUE) > 0, 1L, 0L),
       out_score = if_else(
-        rowSums(is.na(select(., out_gia:out_gif))) > 0, 
+        rowSums(is.na(pick(out_gia:out_gif))) > 0, 
         NA_real_, 
-        rowSums(select(., out_gia:out_gif), na.rm = TRUE)
+        rowSums(pick(out_gia:out_gif), na.rm = TRUE)
       ),
       homeless_p12m = case_when(homeless_p12m %in% c(7, 9) ~ NA_real_, TRUE ~ homeless_p12m),
       homeless_col = as.integer((homeless_p12m + homeless_fr) > 0),
@@ -72,9 +82,9 @@ read_and_clean_amis <- function(file_path) {
         TRUE ~ 0L
       ),
       gay_support_cont = case_when(
-        rowSums(is.na(dplyr::select(., soccap_msm1, soccap_msm2, soccap_msm3, soccap_msm4))) == 4 ~ NA_real_,
+        rowSums(is.na(dplyr::pick(soccap_msm1, soccap_msm2, soccap_msm3, soccap_msm4))) == 4 ~ NA_real_,
         TRUE ~ rowSums(
-          dplyr::select(., soccap_msm1, soccap_msm2, soccap_msm3, soccap_msm4) %>%
+          dplyr::pick(soccap_msm1, soccap_msm2, soccap_msm3, soccap_msm4) %>%
             mutate(across(everything(), ~ ifelse(.x %in% c(9), 0, .x))) %>% 
             mutate(across(everything(), ~ ifelse(.x <=3, 0, .x))) %>%
             mutate(across(everything(), ~ ifelse(.x > 3, 1, .x))),
@@ -113,8 +123,8 @@ read_and_clean_amis <- function(file_path) {
         TRUE ~ NA_real_
       )),
       member = case_when(
-        rowSums(is.na(select(., starts_with("member")))) == ncol(select(., starts_with("member"))) ~ NA_real_,
-        TRUE ~ rowSums(select(., starts_with("member")), na.rm = TRUE)
+        rowSums(is.na(pick(starts_with("member")))) == ncol(pick(starts_with("member"))) ~ NA_real_,
+        TRUE ~ rowSums(pick(starts_with("member")), na.rm = TRUE)
       )
     )
   print(unique(df$`_censdiv`))

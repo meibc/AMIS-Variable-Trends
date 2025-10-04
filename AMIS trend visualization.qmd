@@ -1,5 +1,5 @@
 ---
-title: "Stigma Trends Explorer"
+title: "AMIS Trends Explorer"
 format:
   html:
     theme: cosmo
