@@ -59,14 +59,18 @@ read_and_clean_amis <- function(file_path) {
       insur_bin  = recode_binary(`_inscat`, one_vals = 2:4, zero_vals = 1),
       income_bin = recode_binary(income, one_vals = 4, zero_vals = 1:3),
       risk_behavior = if_else(rowSums(pick(m_muauhs, m_muahp), na.rm = TRUE) > 0, 1L, 0L),
+      # risk_behavior = ifelse((risk_behavior == 1) & (prep_used == 1), 0L, risk_behavior),
       out_score = if_else(
         rowSums(is.na(pick(out_gia:out_gif))) > 0, 
         NA_real_, 
         rowSums(pick(out_gia:out_gif), na.rm = TRUE)
       ),
+      out_gid = ifelse(out_gid == 2, NA, out_gid),
       homeless_p12m = case_when(homeless_p12m %in% c(7, 9) ~ NA_real_, TRUE ~ homeless_p12m),
       homeless_col = as.integer((homeless_p12m + homeless_fr) > 0),
-    )
+      seehcp = recode_binary(seehcp, one_vals = 1, zero_vals = 0)
+    ) %>%
+    mutate(across(starts_with("out_gi"), ~ ifelse(. == 2, NA, .)))
 
     # Community and Support Scores
   df <- df %>%
@@ -94,17 +98,17 @@ read_and_clean_amis <- function(file_path) {
     )
 
     # Miscellaneous stigma recoding and summaries
-  df <- df %>%
-    mutate(
-      stigma_b1 = recode_binary(stigma_b1, one_vals = 1, zero_vals = 0),
-      stigma_b2 = recode_binary(stigma_b2, one_vals = 1, zero_vals = 0),
-      stigma_b3 = recode_binary(stigma_b3, one_vals = 1, zero_vals = 0),
-      stigma_b4 = recode_binary(stigma_b4, one_vals = 1, zero_vals = 0)
-    ) %>%
-    mutate(
-      stigma_ahs_alt = as.integer(rowSums(across(c(stigma_b1, stigma_b2)), na.rm = TRUE) > 0),
-      stigma_exphs   = as.integer(rowSums(across(c(stigma_b3, stigma_b4)), na.rm = TRUE) > 0)
-    )
+  # df <- df %>%
+  #   mutate(
+  #     stigma_b1 = recode_binary(stigma_b1, one_vals = 1, zero_vals = 0),
+  #     stigma_b2 = recode_binary(stigma_b2, one_vals = 1, zero_vals = 0),
+  #     stigma_b3 = recode_binary(stigma_b3, one_vals = 1, zero_vals = 0),
+  #     stigma_b4 = recode_binary(stigma_b4, one_vals = 1, zero_vals = 0)
+  #   ) %>%
+  #   mutate(
+  #     stigma_ahs_alt = as.integer(rowSums(across(c(stigma_b1, stigma_b2)), na.rm = TRUE) > 0),
+  #     stigma_exphs   = as.integer(rowSums(across(c(stigma_b3, stigma_b4)), na.rm = TRUE) > 0)
+  #   )
 
     # Miscellaneous variables: tolerance, outness
   df <- df %>%
@@ -158,10 +162,10 @@ read_and_clean_amis <- function(file_path) {
       ), levels = c("lt20k", "20_40k", "40k_80k", "80k")),
       
       school4 = factor(case_when(
-        `_educat` == 1 ~ "lths",
-        `_educat` == 2 ~ "hs",
-        `_educat` == 3 ~ "college",
-        `_educat` == 4 ~ "grad"
+        `_educat` == 1 | hleducat_le24 %in% c(2,3,4) ~ "lths",
+        `_educat` == 2 | hleducat_le24 %in% c(5) ~ "hs",
+        `_educat` == 3 | hleducat_le24 %in% c(6) ~ "college",
+        `_educat` == 4 | hleducat_le24 %in% c(7)~ "grad"
       ), levels = c("lths", "hs", "college", "grad")),
       
       prep_status = case_when(
